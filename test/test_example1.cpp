@@ -35,6 +35,8 @@ The second value (2) is the mode of this block of the original image:
 */
 
 #define BOOST_TEST_MODULE BlockDownsampleExample1
+
+//VERY IMPORTANT - include this last
 #include <boost/test/unit_test.hpp>
 
 BOOST_AUTO_TEST_CASE( positive_control )

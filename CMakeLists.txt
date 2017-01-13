@@ -4,7 +4,8 @@ cmake_minimum_required(VERSION 2.4)
 include_directories(include)
 
 find_package(Boost REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
+mark_as_advanced(CLEAR Boost_INCLUDE_DIR) # Because finding Boost is important
+include_directories(${Boost_INCLUDE_DIR})
 
 add_subdirectory(src)
 
