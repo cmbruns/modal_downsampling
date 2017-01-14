@@ -42,7 +42,12 @@ The second value (2) is the mode of this block of the original image:
 #include <vector>
 #include <iostream>
 
-typedef int element_type;
+// element_type must be able to hold all the different label values
+typedef uint8_t element_type;
+
+// label_count_type must be able to hold the maximum number of instances of one label
+typedef uint8_t label_count_type;
+
 typedef boost::multi_array<element_type, 2> array_type;
 
 #define BOOST_TEST_MODULE BlockDownsampleExample1
@@ -188,7 +193,7 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer)
 	BOOST_CHECK(observed1[1] == expected2);
 
 	// Finally, test the real implementation
-	cmb::ModalDownsampler<element_type, 2> downsampler;
+	cmb::ModalDownsampler<element_type, 2, label_count_type> downsampler;
 	std::vector<array_type> observed2 = downsampler.downsample(input);
 	BOOST_CHECK(observed2[0] == expected1);
 	// BOOST_CHECK(observed2[1] == expected2);
