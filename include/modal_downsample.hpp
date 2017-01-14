@@ -25,13 +25,15 @@ namespace cmb {
 		downsamplings_t downsample(const raster_t& original);
 
 		// Below is the API for a future binary streaming interface, because it:
-		// 1) allows small memory implementations, for after everyone notices
+		// 1) allows small memory implementations. For after everyone notices
 		//    this tool is used on an embarrassingly parallelizable pile of
 		//    blocks, and is better run as a large number of processes on one
 		//    multi-CPU cluster node, rather than as one huge memory-hog process 
-		//    that uses all the RAM, and attempts to compensate with a 
-		//    way-too-clever multithreaded implementation.
-		// 2) allows streaming implementations, for after everyone notices that 
+		//    that uses all the RAM on each node, and attempts to compensate 
+		//    with some way-too-clever multithreaded implementation. OK I don't
+		//    have a specific use case in mind for downsampling a terabyte image
+		//    on my iphone; but I like knowing it's possible.
+		// 2) allows streaming implementations. For after everyone notices that 
 		//    I/O is slower than the actual computation for tasks
 		//    like this. This will allow the computation to complete, and for
 		//    the output to finish writing, at almost the same moment that the 

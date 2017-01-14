@@ -27,8 +27,8 @@ struct map_histogram
 };
 
 template<typename LABEL_TYPE, int DIMENSION_COUNT>
-std::vector<boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>>
-cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT>::downsample(const raster_t & original)
+auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT>::downsample(const raster_t & original)
+  -> downsamplings_t // trailing return type for better readability
 {
 	downsamplings_t result;
 
@@ -39,15 +39,7 @@ cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT>::downsample(const raster_t & 
 	};
 	raster_t observed1(boost::extents[2][4]);
 	memcpy(observed1.data(), expected1_primitive, observed1.num_elements() * sizeof(label_t));
-
-	// and the 2 - downsampled image :
-	label_t expected2_primitive[1][2] = {
-		{ 1,2 },
-	};
-	raster_t observed2(boost::extents[1][2]);
-	memcpy(observed2.data(), expected2_primitive, observed2.num_elements() * sizeof(label_t));
 	result.push_back(observed1);
-	result.push_back(observed2);
 
 	return result;
 }
