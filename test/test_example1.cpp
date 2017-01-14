@@ -129,22 +129,27 @@ BOOST_AUTO_TEST_CASE(initialize_multi_array)
 // before implementing the true solution.
 // Return results in-place, to maybe minimize copying, or at least minimize
 // *reasoning* about copying.
-void mock_modal_downsample(const array_type & input, std::vector<array_type> & downsampled)
+std::vector<array_type> mock_modal_downsample(const array_type & input)
 {
 	// the 1 - downsampled image :
 	element_type expected1_primitive[2][4] = {
 		{ 1,1,1,1 },
 		{ 1,2,2,2 },
 	};
-	array_type& observed1 = downsampled[0];
+	array_type observed1(boost::extents[2][4]);
 	memcpy(observed1.data(), expected1_primitive, observed1.num_elements() * sizeof(array_type::element));
 
 	// and the 2 - downsampled image :
 	element_type expected2_primitive[1][2] = {
 		{ 1,2 },
 	};
-	array_type& observed2 = downsampled[1];
+	array_type observed2(boost::extents[1][2]);
 	memcpy(observed2.data(), expected2_primitive, observed2.num_elements() * sizeof(array_type::element));
+
+	std::vector<array_type> result;
+	result.push_back(observed1);
+	result.push_back(observed2);
+	return result;
 }
 
 BOOST_AUTO_TEST_CASE(correct_example1_answer)
@@ -177,34 +182,16 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer)
 	array_type expected2(boost::extents[1][2]);
 	memcpy(expected2.data(), expected2_primitive, expected2.num_elements() * sizeof(array_type::element));
 
-	array_type observed1_orig(boost::extents[2][4]);
-	array_type observed2_orig(boost::extents[1][2]);
-
-	std::vector<array_type> observed;
-	observed.push_back(observed1_orig);
-	observed.push_back(observed2_orig);
-
-	BOOST_CHECK(observed1_orig == observed[0]);
-	BOOST_CHECK(observed2_orig == observed[1]);
-	BOOST_CHECK(observed[0] != expected1);
-	BOOST_CHECK(observed[1] != expected2);
-
 	// Positive control method returns hard-coded answer
-	mock_modal_downsample(input, observed);
+	std::vector<array_type> observed1 = mock_modal_downsample(input);
 	// print< >(std::cout, observed[0]);
-	BOOST_CHECK(observed[0] == expected1);
-	BOOST_CHECK(observed[1] == expected2);
-
-	// Clear output matrices before real test
-	for (array_type& a : observed) {
-		std::fill_n(a.data(), a.num_elements(), 0);
-	}
-	BOOST_CHECK(observed[0] != expected1);
-	BOOST_CHECK(observed[1] != expected2);
+	BOOST_CHECK(observed1[0] == expected1);
+	BOOST_CHECK(observed1[1] == expected2);
 
 	// Finally, test the real implementation
-	cmb::modal_downsample(input, observed);
-	BOOST_CHECK(observed[0] == expected1);
-	BOOST_CHECK(observed[1] == expected2);
+	cmb::ModalDownsampler<element_type, 2> downsampler;
+	std::vector<array_type> observed2 = downsampler.downsample(input);
+	BOOST_CHECK(observed2[0] == expected1);
+	BOOST_CHECK(observed2[1] == expected2);
 }
 
