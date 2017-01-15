@@ -2,6 +2,7 @@
 #pragma warning( disable : 4996 )
 
 #include "modal_downsample.hpp"
+#include "performance_parameters.hpp"
 #include <unordered_map>
 
 // Possible performance tuning parameters below

@@ -7,6 +7,12 @@ find_package(Boost REQUIRED)
 mark_as_advanced(CLEAR Boost_INCLUDE_DIR) # Because finding Boost is important
 include_directories(${Boost_INCLUDE_DIR})
 
+set(MODAL_DOWNSAMPLE_SRCS
+	${CMAKE_SOURCE_DIR}/include/modal_downsample.hpp
+	${CMAKE_SOURCE_DIR}/src/performance_parameters.hpp
+	${CMAKE_SOURCE_DIR}/src/modal_downsample.cpp
+)
+
 add_subdirectory(src)
 
 option(ENABLE_TESTING "Compile Unit Tests?" TRUE)
