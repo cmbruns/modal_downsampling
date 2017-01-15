@@ -1,5 +1,8 @@
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
+mark_as_advanced(CLEAR Boost_UNIT_TEST_FRAMEWORK_LIBRARY_DEBUG)
+mark_as_advanced(CLEAR Boost_UNIT_TEST_FRAMEWORK_LIBRARY_RELEASE)
+
 add_executable(test_example1 
 	test_example1.cpp 
 	../include/modal_downsample.hpp
