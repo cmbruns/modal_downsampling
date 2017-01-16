@@ -121,6 +121,7 @@ namespace cmb {
 		{
 			// we expect exactly two dimensions
 			assert(input_row_pair_t::dimensionality == 2);
+			assert(output_row_t::dimensionality == 1);
 			// and exactly two rows
 			assert(two_rows.shape()[0] == 2);
 
@@ -130,17 +131,8 @@ namespace cmb {
 					label_t label = two_rows[row][p];
 					histogram_t& pixel = pixels_[p / 2];
 					pixel.increment_label(label);
-					// std::cout << (int)label << ", ";
 				}
-				// std::cout << std::endl;
 			}
-
-			for (const histogram_t& p : pixels_) 
-			{
-				const auto& map = p.getMap();
-				std::cout << (int)p.getMode() << ", ";
-			}
-			std::cout << std::endl;
 		}
 
 		// Fold another shard into this shard.
@@ -151,7 +143,13 @@ namespace cmb {
 		void aggregate(const Shard& other) { /* TODO: */ }
 
 		// Write one row of modal label values to the final output
-		void render(output_row_t& output_row) {}
+		void render(output_row_t& output_row) const {
+			assert(output_row_t::dimensionality == 1);
+			assert(output_row.shape()[0] == pixels_.size());
+			for (std::size_t i = 0; i < pixels_.size(); ++i) {
+				output_row[i] = pixels_[i].getMode();
+			}
+		}
 
 	private:
 		std::vector<histogram_t> pixels_;
@@ -175,9 +173,19 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	typedef cmb::Shard<raster_t ,LABEL_COUNT_TYPE> shard_t;
 	typedef boost::multi_array_types::index_range range_t;
 
+
+	// Create a new array to hold the first mipmap
+	std::vector<std::size_t> downsampled_shape(DIMENSION_COUNT);
+	for (int d = 0; d < DIMENSION_COUNT; ++d) {
+		downsampled_shape[d] = original.shape()[d] / 2;
+	}
+	result.push_back(raster_t(downsampled_shape));
+	raster_t& downsampled = result.back();
+
 	const int line_length = original.shape()[DIMENSION_COUNT - 1];
 	const int row_count = original.shape()[DIMENSION_COUNT - 2];
-	// process two rows at a time
+	// process two rows at a time into one downsampled shard
+	// TODO: Parallelize these shardings
 	std::vector<shard_t> top_slice;
 	for (int row = 0; row < row_count; row += 2)
 	{
@@ -190,18 +198,12 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	// TODO: outputting top slice only handles 2D case
 	for (unsigned int r = 0; r < top_slice.size(); ++r) {
 		const shard_t& row = top_slice[r];
-		// row.render(); // TODO:
+		auto index = boost::indices[r][range_t(0, line_length/2)];
+		auto& output_row = downsampled[index];
+		assert( output_row.num_dimensions() == 1 );
+		assert( output_row.shape()[0] == line_length / 2 );
+		row.render(output_row);
 	}
-
-	// TODO: Remove this hard-coded hack to return one particular answer
-	// the 1 - downsampled image :
-	label_t expected1_primitive[2][4] = {
-		{ 1,1,1,1 },
-		{ 1,2,2,2 },
-	};
-	raster_t observed1(boost::extents[2][4]);
-	memcpy(observed1.data(), expected1_primitive, observed1.num_elements() * sizeof(label_t));
-	result.push_back(observed1);
 
 	return result;
 }
