@@ -58,17 +58,22 @@ The second value (2) is the mode of this block of the original image:
 // Stifle MSVC unchecked iterator warning
 #pragma warning( disable : 4996 )
 
+// local headers
 #include "modal_downsample.hpp"
+
+// third party headers
 #include <QThread>
 #include <boost/multi_array.hpp>
 #include <boost/cstdlib.hpp>
+
+// standard headers
 #include <vector>
 #include <iostream>
 
-// element_type must be able to hold all the different label values
+// element_type must be able to hold all the different label values (n)
 typedef uint8_t element_type;
 
-// label_count_type must be able to hold the maximum number of instances of one label
+// label_count_type must be able to hold the maximum number of instances of one label (N)
 typedef uint8_t label_count_type;
 
 typedef boost::multi_array<element_type, 2> array_type;
@@ -96,11 +101,13 @@ void print(std::ostream& os, const element_type& x)
 	os << x;
 }
 
+// Does the boost unit test framework work at all?
 BOOST_AUTO_TEST_CASE( use_boost_unit_test_framework )
 {
     BOOST_CHECK(true);
 }
 
+// Do I understand how to use boost::multi_array?
 // first example from http://www.boost.org/doc/libs/1_63_0/libs/multi_array/doc/user.html
 BOOST_AUTO_TEST_CASE( use_multi_array )
 {
@@ -179,6 +186,7 @@ std::vector<array_type> mock_modal_downsample(const array_type & input)
 	return result;
 }
 
+// Verify first simple example from the spec
 BOOST_AUTO_TEST_CASE(correct_example1_answer)
 {
 	// Example 1. The d = 2, L1 = 2, L2 = 3 image

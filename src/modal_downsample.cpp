@@ -28,6 +28,9 @@ SOFTWARE.
 #include <unordered_map>
 
 /*
+class "map_histogram" represents all of the label counts at one pixel
+of an l-downsampled n-dimensional array.
+
 To recursively track the mode at all levels, we need an intermediate
 data structure to track and aggregate the label histogram at each node.
 If the total number of labels is quite small, then a simple array could
@@ -75,7 +78,7 @@ private:
 // Typedefs (or similar)
 // thank you C++11! for this 'using' thing
 
-// in case we want to experiment with other histogram types...
+// in case we want to experiment with other histogram class types...
 template<typename LABEL_TYPE, typename LABEL_COUNT_TYPE>
 using histogram_t = map_histogram<LABEL_TYPE, LABEL_COUNT_TYPE>;
 
@@ -85,6 +88,41 @@ using shard_t = boost::multi_array<histogram_t<LABEL_TYPE, LABEL_COUNT_TYPE>, 1>
 
 
 ///// BEGIN POSSIBLE PARALLEL WORK UNIT METHODS //////
+
+namespace cmb {
+
+	// Shard represents a one dimensional line of label histograms
+	// from the fastest-changing dimension of an n-dimensional
+	// label field.
+	template<typename ARRAY_TYPE, typename LABEL_COUNT_TYPE>
+	class Shard
+	{
+	public:
+		typedef typename ARRAY_TYPE::value_type label_t;
+		typedef histogram_t<label_t, LABEL_COUNT_TYPE> element_t;
+		// The following typedef took an hour to figure out...
+		typedef typename boost::const_array_view_gen<ARRAY_TYPE, 2>::type input_row_pair_t;
+		typedef typename boost::array_view_gen<ARRAY_TYPE, 1>::type output_row_t;
+
+		// Constructor creates a new shard by downsampling and histogramming 
+		// two consecutive raw rows from the original input image.
+		Shard(const input_row_pair_t& two_rows) {
+		}
+
+		// Fold another shard into this shard.
+		// We expect one such aggregation per output shard, per 
+		// array dimension above "2".
+		// TODO: we probably need at least a 4-dimensional unit test case to 
+		// test this properly.
+		void aggregate(const Shard& other) {}
+
+		// Write one row of modal label values to the final output
+		void render(output_row_t& output_row) {}
+
+	private:
+	};
+
+} // namespace cmb
 
 // 1) Convert two consecutive original image label line sequences into a 
 //    downsampled histogram sequence.
@@ -133,8 +171,17 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	// for best cache coherence.
 	typedef map_histogram<label_t, label_count_t> histogram_t;
 	typedef boost::multi_array<histogram_t, 1> shard_t;
+	typedef cmb::Shard<raster_t ,LABEL_COUNT_TYPE> shard2_t;
+	typedef boost::multi_array_types::index_range range_t;
 
 	const int line_length = original.shape()[DIMENSION_COUNT - 1];
+
+	int slice = 0;
+	int row = 0;
+	auto index = boost::indices[range_t(row, row + 1)][range_t(0, line_length)];
+	const auto& first_two_rows = original[index];
+	shard2_t first_shard(first_two_rows);
+
 	shard_t shard(boost::extents[line_length / 2]);
 	// Two things happen here:
 	//   1) We downsample the labels in the X direction
@@ -154,6 +201,9 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	for (int i = 0; i < DIMENSION_COUNT; ++i) {
 		std::cout << "stride: " << i+1 << ": " << original.strides()[i] << std::endl;
 	}
+
+
+
 
 	// TODO: Remove this hard-coded hack to return one particular answer
 	// the 1 - downsampled image :
