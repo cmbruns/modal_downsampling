@@ -26,6 +26,7 @@ SOFTWARE.
 #include "modal_downsample.hpp"
 #include "performance_parameters.hpp"
 #include <unordered_map>
+#include <map>
 
 /*
 class "map_histogram" represents all of the label counts at one pixel
@@ -64,7 +65,7 @@ public:
 #endif
 	}
 
-	const map_t & getMap() {return map_;}
+	const map_t & getMap() const {return map_;}
 
 private:
 	map_t map_;
@@ -75,38 +76,57 @@ private:
 #endif
 };
 
-// Typedefs (or similar)
-// thank you C++11! for this 'using' thing
-
-// in case we want to experiment with other histogram class types...
-template<typename LABEL_TYPE, typename LABEL_COUNT_TYPE>
-using histogram_t = map_histogram<LABEL_TYPE, LABEL_COUNT_TYPE>;
-
-// A shard is a contiguous one-dimensional run in the X-dimension
-template<typename LABEL_TYPE, typename LABEL_COUNT_TYPE>
-using shard_t = boost::multi_array<histogram_t<LABEL_TYPE, LABEL_COUNT_TYPE>, 1>;
-
 
 ///// BEGIN POSSIBLE PARALLEL WORK UNIT METHODS //////
 
 namespace cmb {
 
-	// Shard represents a one dimensional line of label histograms
-	// from the fastest-changing dimension of an n-dimensional
-	// label field.
+	/* Shard represents a one dimensional line of label histograms
+	    from the fastest-changing dimension of an n-dimensional
+	    label field.
+	   Shard operations are intended to be the fundamental work unit for
+	    multithreaded processing.
+	 */
 	template<typename ARRAY_TYPE, typename LABEL_COUNT_TYPE>
 	class Shard
 	{
 	public:
-		typedef typename ARRAY_TYPE::value_type label_t;
-		typedef histogram_t<label_t, LABEL_COUNT_TYPE> element_t;
+		typedef typename ARRAY_TYPE::element label_t;
+		typedef map_histogram<label_t, LABEL_COUNT_TYPE> element_t;
+		typedef LABEL_COUNT_TYPE label_count_t;
+		typedef map_histogram<label_t, LABEL_COUNT_TYPE> histogram_t;
 		// The following typedef took an hour to figure out...
 		typedef typename boost::const_array_view_gen<ARRAY_TYPE, 2>::type input_row_pair_t;
 		typedef typename boost::array_view_gen<ARRAY_TYPE, 1>::type output_row_t;
 
 		// Constructor creates a new shard by downsampling and histogramming 
 		// two consecutive raw rows from the original input image.
-		Shard(const input_row_pair_t& two_rows) {
+		Shard(const input_row_pair_t& two_rows) 
+			: pixels_( two_rows.shape()[1] / 2 )
+		{
+			// we expect exactly two dimensions
+			assert(input_row_pair_t::dimensionality == 2);
+			// and exactly two rows
+			assert(two_rows.shape()[0] == 2);
+
+			const int pixels_per_row = two_rows.shape()[1];
+			for (int row = 0; row < 2; ++ row) {
+				for (int p = 0; p < pixels_per_row; ++p) {
+					label_t label = two_rows[row][p];
+					histogram_t& pixel = pixels_[p / 2];
+					pixel.increment_label(label);
+					std::cout << (int)label << ", ";
+				}
+				std::cout << std::endl;
+			}
+
+			for (const histogram_t& p : pixels_) {
+				const auto& map = p.getMap();
+				for (const auto& entry : map) {
+					std::cout << (int)entry.first << "(" << (int)entry.second << "), ";
+				}
+				std::cout << std::endl;
+			}
 		}
 
 		// Fold another shard into this shard.
@@ -114,47 +134,16 @@ namespace cmb {
 		// array dimension above "2".
 		// TODO: we probably need at least a 4-dimensional unit test case to 
 		// test this properly.
-		void aggregate(const Shard& other) {}
+		void aggregate(const Shard& other) { /* TODO: */ }
 
 		// Write one row of modal label values to the final output
 		void render(output_row_t& output_row) {}
 
 	private:
+		std::vector<histogram_t> pixels_;
 	};
 
 } // namespace cmb
-
-// 1) Convert two consecutive original image label line sequences into a 
-//    downsampled histogram sequence.
-// TODO: maybe "original" argument should be a view...
-template<typename LABEL_TYPE, typename LABEL_COUNT_TYPE>
-shard_t<LABEL_TYPE, LABEL_COUNT_TYPE>
-aggregate_shard(const boost::multi_array<LABEL_TYPE, 2> & original)
-{
-	const int line_length = original.shape()[1];
-	const int scan_line_count = original.shape()[0];
-	// Assume two scan lines...
-	// (maybe one line would be OK here, in case of 1D downsamping?)
-	assert(scan_line_count == 2);
-
-	shard_t<LABEL_TYPE, LABEL_COUNT_TYPE> result_shard(line_length / 2);
-
-	// Two things happen here:
-	//   1) We downsample the labels in the X and Y directions (4X total)
-	//   2) We stop using raw labels, and begin using histograms
-	for (int scan_line = 0; scan_line < original.shape()[0]; ++scan_line) 
-	{
-		for (int i = 0; i < line_length; ++i) 
-		{
-			LABEL_TYPE label = original[scan_line][i];
-			histogram_t<LABEL_TYPE, LABEL_COUNT_TYPE> & pixel = result_shard[i / 2];
-			pixel.increment_label(label);
-		}
-	}
-	return result_shard;
-}
-
-// 2) Combine histograms from two shards
 
 ///// END POSSIBLE PARALLEL WORK UNIT METHODS //////
 
@@ -169,40 +158,19 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	// TODO: First downsample in the first dimension, one 1D shard at at time
 	// This shard should be from the fastest-moving (final) dimension,
 	// for best cache coherence.
-	typedef map_histogram<label_t, label_count_t> histogram_t;
-	typedef boost::multi_array<histogram_t, 1> shard_t;
-	typedef cmb::Shard<raster_t ,LABEL_COUNT_TYPE> shard2_t;
+	typedef cmb::Shard<raster_t ,LABEL_COUNT_TYPE> shard_t;
 	typedef boost::multi_array_types::index_range range_t;
 
 	const int line_length = original.shape()[DIMENSION_COUNT - 1];
-
-	int slice = 0;
 	int row = 0;
-	auto index = boost::indices[range_t(row, row + 1)][range_t(0, line_length)];
+	auto index = boost::indices[range_t(row, row + 2)][range_t(0, line_length)];
 	const auto& first_two_rows = original[index];
-	shard2_t first_shard(first_two_rows);
-
-	shard_t shard(boost::extents[line_length / 2]);
-	// Two things happen here:
-	//   1) We downsample the labels in the X direction
-	//   2) We stop using raw integers, and begin using histograms
-	for (int i = 0; i < line_length; ++i) {
-		label_t label = original[0][i]; // TODO: different dimensions...
-		histogram_t & pixel = shard[i / 2];
-		pixel.increment_label(label);
-	}
+	shard_t first_shard(first_two_rows);
 
 	// Print sanity checks
-	for (histogram_t pixel : shard) {
-		for (auto count : pixel.getMap()) {
-			std::cout << (int)count.first << ", " << (int)count.second << std::endl;
-		}
-	}
 	for (int i = 0; i < DIMENSION_COUNT; ++i) {
 		std::cout << "stride: " << i+1 << ": " << original.strides()[i] << std::endl;
 	}
-
-
 
 
 	// TODO: Remove this hard-coded hack to return one particular answer
