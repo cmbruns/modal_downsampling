@@ -47,10 +47,16 @@ template<typename LABEL_TYPE, typename LABEL_COUNT_TYPE>
 class map_histogram
 {
 public:
-	typedef std::unordered_map<LABEL_TYPE, LABEL_COUNT_TYPE> map_t;
+	typedef LABEL_TYPE label_t;
+	typedef LABEL_COUNT_TYPE label_count_t;
+	typedef std::unordered_map<label_t, label_count_t> map_t;
 
 	map_histogram() 
 		: map_(INITIAL_HISTOGRAM_BUCKET_COUNT)
+#ifdef DO_CACHE_MODE_VALUE
+		, cached_mode_value_(0)
+		, cached_mode_count_(0)
+#endif
 	{}
 
 	void increment_label(LABEL_TYPE label)
@@ -66,6 +72,15 @@ public:
 	}
 
 	const map_t & getMap() const {return map_;}
+
+	label_t getMode() const 
+	{
+#ifdef DO_CACHE_MODE_VALUE
+		return cached_mode_value_;
+#else
+		TODO:
+#endif
+	}
 
 private:
 	map_t map_;
@@ -115,18 +130,17 @@ namespace cmb {
 					label_t label = two_rows[row][p];
 					histogram_t& pixel = pixels_[p / 2];
 					pixel.increment_label(label);
-					std::cout << (int)label << ", ";
+					// std::cout << (int)label << ", ";
 				}
-				std::cout << std::endl;
+				// std::cout << std::endl;
 			}
 
-			for (const histogram_t& p : pixels_) {
+			for (const histogram_t& p : pixels_) 
+			{
 				const auto& map = p.getMap();
-				for (const auto& entry : map) {
-					std::cout << (int)entry.first << "(" << (int)entry.second << "), ";
-				}
-				std::cout << std::endl;
+				std::cout << (int)p.getMode() << ", ";
 			}
+			std::cout << std::endl;
 		}
 
 		// Fold another shard into this shard.
@@ -155,23 +169,29 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 	downsamplings_t result;
 
 
-	// TODO: First downsample in the first dimension, one 1D shard at at time
+	// Downsample in the first dimension, one 1D shard at at time
 	// This shard should be from the fastest-moving (final) dimension,
 	// for best cache coherence.
 	typedef cmb::Shard<raster_t ,LABEL_COUNT_TYPE> shard_t;
 	typedef boost::multi_array_types::index_range range_t;
 
 	const int line_length = original.shape()[DIMENSION_COUNT - 1];
-	int row = 0;
-	auto index = boost::indices[range_t(row, row + 2)][range_t(0, line_length)];
-	const auto& first_two_rows = original[index];
-	shard_t first_shard(first_two_rows);
-
-	// Print sanity checks
-	for (int i = 0; i < DIMENSION_COUNT; ++i) {
-		std::cout << "stride: " << i+1 << ": " << original.strides()[i] << std::endl;
+	const int row_count = original.shape()[DIMENSION_COUNT - 2];
+	// process two rows at a time
+	std::vector<shard_t> top_slice;
+	for (int row = 0; row < row_count; row += 2)
+	{
+		// Downsample two rows into one shard histogram
+		auto index = boost::indices[range_t(row, row + 2)][range_t(0, line_length)];
+		const auto& two_rows = original[index];
+		top_slice.push_back(shard_t(two_rows));
 	}
 
+	// TODO: outputting top slice only handles 2D case
+	for (unsigned int r = 0; r < top_slice.size(); ++r) {
+		const shard_t& row = top_slice[r];
+		// row.render(); // TODO:
+	}
 
 	// TODO: Remove this hard-coded hack to return one particular answer
 	// the 1 - downsampled image :
