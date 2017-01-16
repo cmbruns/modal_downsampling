@@ -59,6 +59,7 @@ The second value (2) is the mode of this block of the original image:
 #pragma warning( disable : 4996 )
 
 #include "modal_downsample.hpp"
+#include <QThread>
 #include <boost/multi_array.hpp>
 #include <boost/cstdlib.hpp>
 #include <vector>
