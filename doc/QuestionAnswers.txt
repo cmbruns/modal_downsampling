@@ -1,0 +1,31 @@
+Your code should use the fastest possible parallel algorithm. Answer the following questions about computational complexity. Let N be the number of pixels in the original image, n the number of unique pixel values in the original image, and M the number of parallel threads.
+
+(1) How does the execution time of the fastest parallel algorithm scale with N, n, and M?
+
+Execution time scales as O(N*log(N)/M)
+
+First we can sketch some limits on the time complexity by examining the shape of the inputs and outputs. The size of each l-downsampled array is N/2^(ld). Thus the combined size of the outputs is O(N), and the total number of operations must be no simpler than O(N). Thus the total execution time must be at least O(N/M). This gives us a hard lower bound on the asymptotic algorithmic complexity.
+
+But we might not be able to achieve O(N/M) execution time in practice, because the mode-finding problem adds some complexity. 
+
+Consider the related problem of simply finding one mode of the full input array. In other words, the mode of a 1x1x1x...x1 generalized l-downsampled array, where we have extended the definition of "l-downnsampled image" to include additional downsamplings in which every dimension is reduced to size 1. This mode can be computed in O(N) time by first 
+  1) create a label hash map of size n (n can be no larger than N), 
+  2) iterate over the N pixels in O(N) time; 
+    at each pixel
+      increment the observed count for the pixel label value in O(1) time
+      update our estimate of the array mode in O(1) time
+    
+Thus it takes O(N) operations to populate the mode for even the very smallest l-downsampled image. 
+
+If we assume that it takes total O(N) time at each l-downsampled image, the total number of operations to independently compute all of the l-downsampled images would be O(N * log(N)). But can we amortize this cost over the full computation by computing the modes recursively?
+
+The label-count hashmap for one pixel in an l-downsampled array can be updated from pixel hashmaps in an (l-1)-downsampled array in O(n) time or better. Notice that, at a particular l-downsampled array level, the sum of the sizes of all of the pixel hashtable entries need be no more than N. So the total amortized operations for updating the label-count hashmap for one l-downsampled array is O(N).
+
+(TODO: finish analysis)
+
+(2) How does memory usage scale with N, n, and M?
+
+Total storage usage scales as O(N) + M*O(n).
+
+This depends on what you mean by "memory". The total size of the inputs and outputs is O(N), so the total storage required is O(N). But smaller memory implementations are possible, in case where RAM is limited, and the image arrays are being streamed from and to network storage or disk or some other slower serial-access container. But storing the working hashmap for label counts will, in general, require O(n) local storage. Similarly, each thread probably needs at least O(n) local storage in general. A streaming small-RAM implementation using M*O(n) RAM, plus O(N) other storage, should be possible.
+
