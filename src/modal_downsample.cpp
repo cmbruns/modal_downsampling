@@ -25,6 +25,8 @@ SOFTWARE.
 
 #include "modal_downsample.hpp"
 #include "performance_parameters.hpp"
+
+#include <algorithm>
 #include <unordered_map>
 #include <map>
 
@@ -114,6 +116,8 @@ namespace cmb {
 		typedef typename boost::const_array_view_gen<ARRAY_TYPE, 2>::type input_row_pair_t;
 		typedef typename boost::array_view_gen<ARRAY_TYPE, 1>::type output_row_t;
 
+		// TODO separate into shardification and downsampling.
+
 		// Constructor creates a new shard by downsampling and histogramming 
 		// two consecutive raw rows from the original input image.
 		Shard(const input_row_pair_t& two_rows) 
@@ -175,34 +179,51 @@ auto cmb::ModalDownsampler<LABEL_TYPE, DIMENSION_COUNT, LABEL_COUNT_TYPE>::downs
 
 
 	// Create a new array to hold the first mipmap
+
+	int smallest_dimension = 100;
 	std::vector<std::size_t> downsampled_shape(DIMENSION_COUNT);
 	for (int d = 0; d < DIMENSION_COUNT; ++d) {
 		downsampled_shape[d] = original.shape()[d] / 2;
+		smallest_dimension = std::min((int)smallest_dimension, (int)downsampled_shape[d]);
 	}
-	result.push_back(raster_t(downsampled_shape));
-	raster_t& downsampled = result.back();
 
-	const int line_length = original.shape()[DIMENSION_COUNT - 1];
-	const int row_count = original.shape()[DIMENSION_COUNT - 2];
-	// process two rows at a time into one downsampled shard
-	// TODO: Parallelize these shardings
-	std::vector<shard_t> top_slice;
-	for (int row = 0; row < row_count; row += 2)
+	// Populate each downsample in sequence
+	while (smallest_dimension > 1) 
 	{
-		// Downsample two rows into one shard histogram
-		auto index = boost::indices[range_t(row, row + 2)][range_t(0, line_length)];
-		const auto& two_rows = original[index];
-		top_slice.push_back(shard_t(two_rows));
-	}
+		result.push_back(raster_t(downsampled_shape));
+		raster_t& downsampled = result.back();
 
-	// TODO: outputting top slice only handles 2D case
-	for (unsigned int r = 0; r < top_slice.size(); ++r) {
-		const shard_t& row = top_slice[r];
-		auto index = boost::indices[r][range_t(0, line_length/2)];
-		auto& output_row = downsampled[index];
-		assert( output_row.num_dimensions() == 1 );
-		assert( output_row.shape()[0] == line_length / 2 );
-		row.render(output_row);
+		const int line_length = original.shape()[DIMENSION_COUNT - 1];
+		const int row_count = original.shape()[DIMENSION_COUNT - 2];
+
+		// process two rows at a time into one downsampled shard
+		// TODO: Parallelize these shardings
+		std::vector<shard_t> top_slice;
+		for (int row = 0; row < row_count; row += 2)
+		{
+			// Downsample two rows into one shard histogram
+			auto index = boost::indices[range_t(row, row + 2)][range_t(0, line_length)];
+			const auto& two_rows = original[index];
+			top_slice.push_back(shard_t(two_rows));
+		}
+
+		// TODO: outputting top slice only handles 2D case
+		for (unsigned int r = 0; r < top_slice.size(); ++r) {
+			const shard_t& row = top_slice[r];
+			auto index = boost::indices[r][range_t(0, line_length/2)];
+			auto& output_row = downsampled[index];
+			assert( output_row.num_dimensions() == 1 );
+			assert( output_row.shape()[0] == line_length / 2 );
+			row.render(output_row);
+		}
+
+		// Update dimensions for next smaller downsampling
+		for (int d = 0; d < DIMENSION_COUNT; ++d) {
+			downsampled_shape[d] = downsampled_shape[d] / 2;
+			smallest_dimension = std::min((int)smallest_dimension, (int)downsampled_shape[d]);
+		}
+
+		break; // TODO: make all the mipmaps
 	}
 
 	return result;
