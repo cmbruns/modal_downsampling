@@ -112,16 +112,8 @@ namespace cmb {
 	};
 
 	// Zero dimensional kernel (just numbers -> histogram)
-	template<typename LABEL_TYPE>
-	void agglomerate(histogram_t<LABEL_TYPE>& result, const LABEL_TYPE& lhs, const LABEL_TYPE& rhs)
-	{
-		result.agglomerate(lhs);
-		result.agglomerate(rhs);
-	}
-
-	// Zero dimensional kernel (just single histograms -> histogram)
-	template<typename LABEL_TYPE>
-	void agglomerate(histogram_t<LABEL_TYPE>& result, const histogram_t<LABEL_TYPE>& lhs, const histogram_t<LABEL_TYPE>& rhs)
+	template<typename AGGLOMERATED_T, typename SOURCE_T>
+	void agglomerate(AGGLOMERATED_T& result, const SOURCE_T& lhs, const SOURCE_T& rhs)
 	{
 		result.agglomerate(lhs);
 		result.agglomerate(rhs);
