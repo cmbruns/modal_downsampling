@@ -26,6 +26,8 @@ SOFTWARE.
 
 #include <iostream>
 #include <vector>
+#include <unordered_map>
+
 #include <boost/multi_array.hpp>
 
 namespace cmb {
@@ -57,6 +59,100 @@ namespace cmb {
 		// Top-level downsampler
 		downsamplings_t downsample(const raster_t& original);
 	};
+
+
+	// New way below?
+
+	/* 
+		Class histogram_t stores the counts of all label values
+		observed in a particular downsampled image pixel.
+	 */
+	template<typename LABEL_TYPE>
+	class histogram_t
+	{
+	public:
+		typedef LABEL_TYPE label_t;
+		typedef std::size_t count_t;
+
+		// parameter "initial_size" set the number of buckets in the hash.
+		// this should be set to the expected number of distinct labels at
+		// this particular downsampling, to avoid frequent rehashing.
+		histogram_t(std::size_t initial_size = 2)
+			: map_(initial_size)
+			, cached_mode_count(0)
+			, cached_mode_label(0)
+		{}
+
+		const label_t& get_mode() {return cached_mode_label;}
+
+		// Increment raw label value counts
+		void increment_label(const label_t& label, const count_t& inc = 1) {
+			map_[label] += inc;
+			// cache mode value, so we can access mode in constant time
+			const count_t& c = map_[label];
+			if (c > cached_mode_count) {
+				cached_mode_count = c;
+				cached_mode_label = label;
+			}
+		}
+
+		// Agglomerate another histogram into this one
+		void combine_histogram(const histogram_t& rhs) {
+			for (auto entry : rhs.map_) {
+				const label_t& label = entry.first;
+				const count_t& count = entry.second;
+				increment_label(label, count);
+			}
+		}
+
+	private:
+		std::unordered_map<label_t, count_t> map_;
+		count_t cached_mode_count;
+		label_t cached_mode_label;
+	};
+
+	// Zero dimensional kernel (just numbers -> histogram)
+	template<typename LABEL_TYPE>
+	void agglomerate(histogram_t<LABEL_TYPE>& result, const LABEL_TYPE& lhs, const LABEL_TYPE& rhs)
+	{
+		result.increment_label(lhs);
+		result.increment_label(rhs);
+	}
+
+	// Zero dimensional kernel (just single histograms -> histogram)
+	template<typename LABEL_TYPE>
+	void agglomerate(histogram_t<LABEL_TYPE>& result, const histogram_t<LABEL_TYPE>& lhs, const histogram_t<LABEL_TYPE>& rhs)
+	{
+		result.combine_histogram(lhs);
+		result.combine_histogram(rhs);
+	}
+
+	// Agglomerate two n-dimensional arrays.
+	// This method is recursive on the number of dimensions.
+	// When the number of dimensions gets to zero, it automatically reverts
+	// to the zero-dimensional downsample kernel (above).
+	// 1) convert raw values to histograms
+	template<typename LABEL_TYPE, int DIMENSION_COUNT>
+	void agglomerate(
+		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
+		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& lhs,
+		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& rhs)
+	{
+		for (std::size_t i = 0; i < result.size(); ++i) {
+			agglomerate(result[i], lhs[i], rhs[i]);
+		}
+	}
+	// 2) agglomerate histograms
+	template<typename LABEL_TYPE, int DIMENSION_COUNT>
+	void agglomerate(
+		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
+		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& lhs,
+		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& rhs)
+	{
+		for (std::size_t i = 0; i < result.size(); ++i) {
+			agglomerate(result[i], lhs[i], rhs[i]);
+		}
+	}
 
 } // namespace cmb
 

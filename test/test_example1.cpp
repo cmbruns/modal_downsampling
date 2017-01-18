@@ -77,6 +77,7 @@ typedef uint8_t element_type;
 typedef uint8_t label_count_type;
 
 typedef boost::multi_array<element_type, 2> array_type;
+typedef boost::multi_array<cmb::histogram_t<element_type>, 2> hist_array_type;
 
 #define BOOST_TEST_MODULE BlockDownsampleExample1
 
@@ -230,3 +231,45 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer)
 	// BOOST_CHECK(observed2[1] == expected2);
 }
 
+// Verify first simple example from the spec
+BOOST_AUTO_TEST_CASE(correct_example1_answer_recursive)
+{
+	// Example 1. The d = 2, L1 = 2, L2 = 3 image
+	element_type input_primitive[4][8] = {
+		{ 1,1,1,1,1,1,1,1 },
+		{ 1,2,1,2,1,2,1,2 },
+		{ 1,1,2,2,2,2,2,2 },
+		{ 1,2,2,2,2,2,2,2 }
+	};
+	array_type input(boost::extents[4][8]);
+	memcpy(input.data(), input_primitive, input.num_elements() * sizeof(array_type::element));
+	BOOST_CHECK_EQUAL(input[0][0], 1);
+	BOOST_CHECK_EQUAL(input[3][7], 2);
+	BOOST_CHECK_EQUAL(input[1][1], 2);
+
+	// yields the 1 - downsampled image :
+	element_type expected1_primitive[2][4] = {
+		{ 1,1,1,1 },
+		{ 1,2,2,2 },
+	};
+	array_type expected1(boost::extents[2][4]);
+	memcpy(expected1.data(), expected1_primitive, expected1.num_elements() * sizeof(array_type::element));
+
+	// and the 2 - downsampled image :
+	element_type expected2_primitive[1][2] = {
+		{ 1,2 },
+	};
+	array_type expected2(boost::extents[1][2]);
+	memcpy(expected2.data(), expected2_primitive, expected2.num_elements() * sizeof(array_type::element));
+
+	array_type observed1(boost::extents[2][4]);
+	hist_array_type count_field1(boost::extents[2][4]);
+	assert(input.shape()[0] == count_field1.shape()[0] * 2);
+	assert(input.shape()[1] == count_field1.shape()[1] * 2);
+	for (std::size_t row = 0; row < count_field1.size(); ++row)
+	{
+		// Read two rows at a time
+		// cmb::downsample(count_field1[row], input[2*row], input[2*row+1]);
+	}
+	// TODO:
+}
