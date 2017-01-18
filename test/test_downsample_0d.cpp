@@ -46,12 +46,12 @@ BOOST_AUTO_TEST_CASE(test_downsample_zero_d_histograms)
 
 	hist_t downsampled, lhs, rhs;
 
-	lhs.increment_label(1, 4);
-	lhs.increment_label(2, 3);
+	lhs.agglomerate(1, 4);
+	lhs.agglomerate(2, 3);
 	BOOST_CHECK_EQUAL(lhs.get_mode(), 1);
 
-	rhs.increment_label(2, 3);
-	rhs.increment_label(3, 4);
+	rhs.agglomerate(2, 3);
+	rhs.agglomerate(3, 4);
 	BOOST_CHECK_EQUAL(rhs.get_mode(), 3);
 
 	cmb::agglomerate(downsampled, lhs, rhs);

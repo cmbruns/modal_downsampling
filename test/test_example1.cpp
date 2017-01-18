@@ -266,10 +266,6 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer_recursive)
 	hist_array_type count_field1(boost::extents[2][4]);
 	assert(input.shape()[0] == count_field1.shape()[0] * 2);
 	assert(input.shape()[1] == count_field1.shape()[1] * 2);
-	for (std::size_t row = 0; row < count_field1.size(); ++row)
-	{
-		// Read two rows at a time
-		// cmb::downsample(count_field1[row], input[2*row], input[2*row+1]);
-	}
+	// cmb::downsample(count_field1, input);
 	// TODO:
 }

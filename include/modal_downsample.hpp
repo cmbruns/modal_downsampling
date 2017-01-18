@@ -86,7 +86,7 @@ namespace cmb {
 		const label_t& get_mode() {return cached_mode_label;}
 
 		// Increment raw label value counts
-		void increment_label(const label_t& label, const count_t& inc = 1) {
+		void agglomerate(const label_t& label, const count_t& inc = 1) {
 			map_[label] += inc;
 			// cache mode value, so we can access mode in constant time
 			const count_t& c = map_[label];
@@ -97,11 +97,11 @@ namespace cmb {
 		}
 
 		// Agglomerate another histogram into this one
-		void combine_histogram(const histogram_t& rhs) {
+		void agglomerate(const histogram_t& rhs) {
 			for (auto entry : rhs.map_) {
 				const label_t& label = entry.first;
 				const count_t& count = entry.second;
-				increment_label(label, count);
+				agglomerate(label, count);
 			}
 		}
 
@@ -115,16 +115,16 @@ namespace cmb {
 	template<typename LABEL_TYPE>
 	void agglomerate(histogram_t<LABEL_TYPE>& result, const LABEL_TYPE& lhs, const LABEL_TYPE& rhs)
 	{
-		result.increment_label(lhs);
-		result.increment_label(rhs);
+		result.agglomerate(lhs);
+		result.agglomerate(rhs);
 	}
 
 	// Zero dimensional kernel (just single histograms -> histogram)
 	template<typename LABEL_TYPE>
 	void agglomerate(histogram_t<LABEL_TYPE>& result, const histogram_t<LABEL_TYPE>& lhs, const histogram_t<LABEL_TYPE>& rhs)
 	{
-		result.combine_histogram(lhs);
-		result.combine_histogram(rhs);
+		result.agglomerate(lhs);
+		result.agglomerate(rhs);
 	}
 
 	// Agglomerate two n-dimensional arrays.
@@ -149,8 +149,51 @@ namespace cmb {
 		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& lhs,
 		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& rhs)
 	{
+		assert(lhs.size() == result.size());
+		assert(rhs.size() == result.size());
 		for (std::size_t i = 0; i < result.size(); ++i) {
 			agglomerate(result[i], lhs[i], rhs[i]);
+		}
+	}
+
+	// General downsampling for dimensions 2 and higher
+	template<typename LABEL_TYPE, int DIMENSION_COUNT>
+	void downsample(
+		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
+		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& original)
+	{
+		assert(original.size() == 2 * result.size());
+
+		// Create two intermediate downsampled subarrays
+		auto slice1 = result[0];
+		auto slice2 = result[0];
+		histogram_t<LABEL_TYPE> empty_histogram;
+
+		for (std::size_t i = 0; i < result.size(); ++i)
+		{
+			// Clear intermediate data structures
+			std::fill(slice1.begin(), slice1.end(), empty_histogram);
+			std::fill(slice2.begin(), slice2.end(), empty_histogram);
+
+			// Downsample subfields
+			downsample(slice1, original[2 * i]);
+			downsample(slice2, original[2 * i + 1]);
+
+			agglomerate(result[i], slice1, slice2);
+		}
+	}
+
+	// 1-dimensional specialization
+	template<typename LABEL_TYPE>
+	void downsample(
+		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
+		const boost::multi_array<LABEL_TYPE, 1>& original)
+	{
+		assert(original.size() == 2 * result.size());
+
+		for (std::size_t i = 0; i < result.size(); ++i)
+		{
+			agglomerate(result[i], original[2*i], original[2*i+1]);
 		}
 	}
 

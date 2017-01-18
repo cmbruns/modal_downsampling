@@ -27,13 +27,36 @@ SOFTWARE.
 // local headers
 #include "modal_downsample.hpp"
 
-#define BOOST_TEST_MODULE DownsampleOneDimension
+#define BOOST_TEST_MODULE agglomerateOneDimension
 
 //VERY IMPORTANT - include this last
 #include <boost/test/unit_test.hpp>
 
 // Raw label values to histograms
-BOOST_AUTO_TEST_CASE( test_downsample_1d_raw )
+BOOST_AUTO_TEST_CASE(test_downsample_1d_raw)
+{
+	typedef int label_t;
+	typedef cmb::histogram_t<label_t> hist_t;
+
+	const int dim0 = 32;
+	const auto dim_input = boost::extents[dim0];
+	const auto dim_output = boost::extents[dim0/2];
+
+	boost::multi_array<label_t, 1> original(dim_input);
+	boost::multi_array<hist_t, 1> result(dim_output);
+
+	const label_t test_value = 50;
+	std::fill(original.begin(), original.end(), test_value);
+
+	cmb::downsample(result, original);
+
+	for (hist_t h : result) {
+		BOOST_CHECK_EQUAL(h.get_mode(), test_value);
+	}
+}
+
+// Raw label values to histograms
+BOOST_AUTO_TEST_CASE( test_agglomerate_1d_raw )
 {
 	typedef int label_t;
 	typedef cmb::histogram_t<label_t> hist_t;
@@ -56,7 +79,7 @@ BOOST_AUTO_TEST_CASE( test_downsample_1d_raw )
 }
 
 // histograms to histograms
-BOOST_AUTO_TEST_CASE(test_downsample_1d_hist)
+BOOST_AUTO_TEST_CASE(test_agglomerate_1d_hist)
 {
 	typedef int label_t;
 	typedef cmb::histogram_t<label_t> hist_t;
@@ -68,12 +91,12 @@ BOOST_AUTO_TEST_CASE(test_downsample_1d_hist)
 	boost::multi_array<hist_t, 1> result(dim);
 
 	for (std::size_t i = 1; i < 20; ++i) {
-		lhs[i].increment_label(1, 4);
-		lhs[i].increment_label(2, 3);
+		lhs[i].agglomerate(1, 4);
+		lhs[i].agglomerate(2, 3);
 		BOOST_CHECK_EQUAL(lhs[i].get_mode(), 1);
 
-		rhs[i].increment_label(2, 3);
-		rhs[i].increment_label(3, 4);
+		rhs[i].agglomerate(2, 3);
+		rhs[i].agglomerate(3, 4);
 		BOOST_CHECK_EQUAL(rhs[i].get_mode(), 3);
 	}
 
