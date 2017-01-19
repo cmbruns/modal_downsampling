@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE( test_downsample_zero_d_raw_values )
 {
 	cmb::histogram_t<int> downsampled(2);
 	const int test_value = 50;
-	cmb::agglomerate(downsampled, test_value, test_value);
+	cmb::agglomerate_scalar(downsampled, test_value, test_value);
     BOOST_CHECK_EQUAL(downsampled.get_mode(), test_value);
 }
 
@@ -46,15 +46,15 @@ BOOST_AUTO_TEST_CASE(test_downsample_zero_d_histograms)
 
 	hist_t downsampled, lhs, rhs;
 
-	lhs.agglomerate(1, 4);
-	lhs.agglomerate(2, 3);
+	lhs.agglomerate_scalar(1, 4);
+	lhs.agglomerate_scalar(2, 3);
 	BOOST_CHECK_EQUAL(lhs.get_mode(), 1);
 
-	rhs.agglomerate(2, 3);
-	rhs.agglomerate(3, 4);
+	rhs.agglomerate_scalar(2, 3);
+	rhs.agglomerate_scalar(3, 4);
 	BOOST_CHECK_EQUAL(rhs.get_mode(), 3);
 
-	cmb::agglomerate(downsampled, lhs, rhs);
+	cmb::agglomerate_scalar(downsampled, lhs, rhs);
 	BOOST_CHECK_EQUAL(downsampled.get_mode(), 2);
 }
 

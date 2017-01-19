@@ -53,6 +53,13 @@ BOOST_AUTO_TEST_CASE(test_downsample_1d_raw)
 	for (hist_t h : result) {
 		BOOST_CHECK_EQUAL(h.get_mode(), test_value);
 	}
+
+	boost::multi_array<hist_t, 1> result2(dim_output);
+	cmb::downsample_array(result2, original);
+	for (hist_t h : result2) {
+		BOOST_CHECK_EQUAL(h.get_mode(), test_value);
+	}
+
 }
 
 // Raw label values to histograms
@@ -71,7 +78,7 @@ BOOST_AUTO_TEST_CASE( test_agglomerate_1d_raw )
 	std::fill(lhs.begin(), lhs.end(), test_value);
 	std::fill(rhs.begin(), rhs.end(), test_value);
 
-	cmb::agglomerate(result, lhs, rhs);
+	cmb::agglomerate_array(result, lhs, rhs);
 
 	for (hist_t h : result) {
 		BOOST_CHECK_EQUAL(h.get_mode(), test_value);
@@ -91,16 +98,16 @@ BOOST_AUTO_TEST_CASE(test_agglomerate_1d_hist)
 	boost::multi_array<hist_t, 1> result(dim);
 
 	for (std::size_t i = 1; i < 20; ++i) {
-		lhs[i].agglomerate(1, 4);
-		lhs[i].agglomerate(2, 3);
+		lhs[i].agglomerate_scalar(1, 4);
+		lhs[i].agglomerate_scalar(2, 3);
 		BOOST_CHECK_EQUAL(lhs[i].get_mode(), 1);
 
-		rhs[i].agglomerate(2, 3);
-		rhs[i].agglomerate(3, 4);
+		rhs[i].agglomerate_scalar(2, 3);
+		rhs[i].agglomerate_scalar(3, 4);
 		BOOST_CHECK_EQUAL(rhs[i].get_mode(), 3);
 	}
 
-	cmb::agglomerate(result, lhs, rhs);
+	cmb::agglomerate_array(result, lhs, rhs);
 
 	for (std::size_t i = 1; i < 20; ++i) {
 		BOOST_CHECK_EQUAL(result[i].get_mode(), 2);

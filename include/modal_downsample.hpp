@@ -86,7 +86,7 @@ namespace cmb {
 		const label_t& get_mode() {return cached_mode_label;}
 
 		// Increment raw label value counts
-		void agglomerate(const label_t& label, const count_t& inc = 1) {
+		void agglomerate_scalar(const label_t& label, const count_t& inc = 1) {
 			map_[label] += inc;
 			// cache mode value, so we can access mode in constant time
 			const count_t& c = map_[label];
@@ -97,11 +97,11 @@ namespace cmb {
 		}
 
 		// Agglomerate another histogram into this one
-		void agglomerate(const histogram_t& rhs) {
+		void agglomerate_scalar(const histogram_t& rhs) {
 			for (auto entry : rhs.map_) {
 				const label_t& label = entry.first;
 				const count_t& count = entry.second;
-				agglomerate(label, count);
+				agglomerate_scalar(label, count);
 			}
 		}
 
@@ -113,10 +113,10 @@ namespace cmb {
 
 	// Zero dimensional kernel (just numbers -> histogram)
 	template<typename AGGLOMERATED_T, typename SOURCE_T>
-	void agglomerate(AGGLOMERATED_T& result, const SOURCE_T& lhs, const SOURCE_T& rhs)
+	void agglomerate_scalar(AGGLOMERATED_T& result, const SOURCE_T& lhs, const SOURCE_T& rhs)
 	{
-		result.agglomerate(lhs);
-		result.agglomerate(rhs);
+		result.agglomerate_scalar(lhs);
+		result.agglomerate_scalar(rhs);
 	}
 
 	// Agglomerate two n-dimensional arrays.
@@ -125,18 +125,18 @@ namespace cmb {
 	// to the zero-dimensional downsample kernel (above).
 	// 1) convert raw values to histograms
 	template<typename LABEL_TYPE, int DIMENSION_COUNT>
-	void agglomerate(
+	void agglomerate_array(
 		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
 		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& lhs,
 		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& rhs)
 	{
 		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate(result[i], lhs[i], rhs[i]);
+			agglomerate_array(result[i], lhs[i], rhs[i]);
 		}
 	}
 	// 2) agglomerate histograms
 	template<typename LABEL_TYPE, int DIMENSION_COUNT>
-	void agglomerate(
+	void agglomerate_array(
 		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
 		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& lhs,
 		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& rhs)
@@ -144,7 +144,32 @@ namespace cmb {
 		assert(lhs.size() == result.size());
 		assert(rhs.size() == result.size());
 		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate(result[i], lhs[i], rhs[i]);
+			agglomerate_array(result[i], lhs[i], rhs[i]);
+		}
+	}
+
+	// 1-D specialization
+	template<typename LABEL_TYPE>
+	void agglomerate_array(
+		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
+		const boost::multi_array<LABEL_TYPE, 1>& lhs,
+		const boost::multi_array<LABEL_TYPE, 1>& rhs)
+	{
+		for (std::size_t i = 0; i < result.size(); ++i) {
+			agglomerate_scalar(result[i], lhs[i], rhs[i]);
+		}
+	}
+	// 2) agglomerate histograms
+	template<typename LABEL_TYPE>
+	void agglomerate_array(
+		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
+		const boost::multi_array<histogram_t<LABEL_TYPE>, 1>& lhs,
+		const boost::multi_array<histogram_t<LABEL_TYPE>, 1>& rhs)
+	{
+		assert(lhs.size() == result.size());
+		assert(rhs.size() == result.size());
+		for (std::size_t i = 0; i < result.size(); ++i) {
+			agglomerate_scalar(result[i], lhs[i], rhs[i]);
 		}
 	}
 
@@ -171,7 +196,7 @@ namespace cmb {
 			downsample(slice1, original[2 * i]);
 			downsample(slice2, original[2 * i + 1]);
 
-			agglomerate(result[i], slice1, slice2);
+			agglomerate_scalar(result[i], slice1, slice2);
 		}
 	}
 
@@ -184,9 +209,47 @@ namespace cmb {
 		assert(original.size() == 2 * result.size());
 
 		for (std::size_t i = 0; i < result.size(); ++i)
+			agglomerate_scalar(result[i], original[2*i], original[2*i+1]);
+	}
+
+	// n-dimensional general method
+	// wrapped in a class so we could do partial specialization, below
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE, int DIMENSIONALITY>
+	struct ArrayDownsampler {
+		static void downsample_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
 		{
-			agglomerate(result[i], original[2*i], original[2*i+1]);
+			assert(RESULT_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
+			assert(ORIGINAL_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
+			assert(original.size() == 2 * result.size());
+			typedef typename result[0]::type result_subarray_t;
+			typedef typename original[0]::type original_subarray_t;
+			for (std::size_t i = 0; i < result.size(); ++i) {
+				downsample_array<result_subarray_t, original_subarray_t, DIMENSIONALITY - 1>(result[i], original[2*i]);
+				downsample_array<result_subarray_t, original_subarray_t, DIMENSIONALITY - 1>(result[i], original[2*i + 1]);
+			}
 		}
+	};
+
+	// 1-dimensional specialization
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE>
+	struct ArrayDownsampler<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, 1> 
+	{
+		static void downsample_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
+		{
+			assert(RESULT_ARRAY_TYPE::dimensionality == 1);
+			assert(ORIGINAL_ARRAY_TYPE::dimensionality == 1);
+			assert(original.size() == 2 * result.size());
+			for (std::size_t i = 0; i < result.size(); ++i) {
+				agglomerate_scalar(result[i], original[2 * i], original[2 * i + 1]);
+			}
+		}
+	};
+
+	// Easier-to-call delegate to ArrayDownsampler class
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE>
+	void downsample_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
+	{
+		ArrayDownsampler<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE::dimensionality>::downsample_array(result, original);
 	}
 
 } // namespace cmb
