@@ -242,8 +242,6 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer)
 	array_type observed2b(boost::extents[1][2]);
 	cmb::render_array(observed2b, hist2);
 	BOOST_CHECK(observed2b == expected2);
-
-
 }
 
 // Verify first simple example from the spec

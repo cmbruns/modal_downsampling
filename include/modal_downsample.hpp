@@ -32,8 +32,6 @@ SOFTWARE.
 
 namespace cmb {
 
-	// New way below?
-
 	/* 
 		Class histogram_t stores the counts of all label values
 		observed in a particular downsampled image pixel.
@@ -91,99 +89,6 @@ namespace cmb {
 	{
 		result.agglomerate_scalar(lhs);
 		result.agglomerate_scalar(rhs);
-	}
-
-	// Agglomerate two n-dimensional arrays.
-	// This method is recursive on the number of dimensions.
-	// When the number of dimensions gets to zero, it automatically reverts
-	// to the zero-dimensional downsample kernel (above).
-	// 1) convert raw values to histograms
-	template<typename LABEL_TYPE, int DIMENSION_COUNT>
-	void agglomerate_array(
-		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
-		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& lhs,
-		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& rhs)
-	{
-		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate_array(result[i], lhs[i], rhs[i]);
-		}
-	}
-	// 2) agglomerate histograms
-	template<typename LABEL_TYPE, int DIMENSION_COUNT>
-	void agglomerate_array(
-		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
-		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& lhs,
-		const boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& rhs)
-	{
-		assert(lhs.size() == result.size());
-		assert(rhs.size() == result.size());
-		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate_array(result[i], lhs[i], rhs[i]);
-		}
-	}
-
-	// 1-D specialization
-	template<typename LABEL_TYPE>
-	void agglomerate_array(
-		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
-		const boost::multi_array<LABEL_TYPE, 1>& lhs,
-		const boost::multi_array<LABEL_TYPE, 1>& rhs)
-	{
-		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate_scalar(result[i], lhs[i], rhs[i]);
-		}
-	}
-	// 2) agglomerate histograms
-	template<typename LABEL_TYPE>
-	void agglomerate_array(
-		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
-		const boost::multi_array<histogram_t<LABEL_TYPE>, 1>& lhs,
-		const boost::multi_array<histogram_t<LABEL_TYPE>, 1>& rhs)
-	{
-		assert(lhs.size() == result.size());
-		assert(rhs.size() == result.size());
-		for (std::size_t i = 0; i < result.size(); ++i) {
-			agglomerate_scalar(result[i], lhs[i], rhs[i]);
-		}
-	}
-
-	// General downsampling for dimensions 2 and higher
-	template<typename LABEL_TYPE, int DIMENSION_COUNT>
-	void downsample(
-		boost::multi_array<histogram_t<LABEL_TYPE>, DIMENSION_COUNT>& result,
-		const boost::multi_array<LABEL_TYPE, DIMENSION_COUNT>& original)
-	{
-		assert(original.size() == 2 * result.size());
-
-		// Create two intermediate downsampled subarrays
-		auto slice1 = result[0];
-		auto slice2 = result[0];
-		histogram_t<LABEL_TYPE> empty_histogram;
-
-		for (std::size_t i = 0; i < result.size(); ++i)
-		{
-			// Clear intermediate data structures
-			std::fill(slice1.begin(), slice1.end(), empty_histogram);
-			std::fill(slice2.begin(), slice2.end(), empty_histogram);
-
-			// Downsample subfields
-			downsample(slice1, original[2 * i]);
-			downsample(slice2, original[2 * i + 1]);
-
-			agglomerate_scalar(result[i], slice1, slice2);
-		}
-	}
-
-	// 1-dimensional specialization
-	template<typename LABEL_TYPE>
-	void downsample(
-		boost::multi_array<histogram_t<LABEL_TYPE>, 1>& result,
-		const boost::multi_array<LABEL_TYPE, 1>& original)
-	{
-		assert(original.size() == 2 * result.size());
-
-		for (std::size_t i = 0; i < result.size(); ++i)
-			agglomerate_scalar(result[i], original[2*i], original[2*i+1]);
 	}
 
 
@@ -284,6 +189,7 @@ namespace cmb {
 	}
 
 
+	// TODO: This part is not working yet...
 	// Convenience method to create all downsampled images in one go
 	template<typename ARRAY_TYPE>
 	std::vector<ARRAY_TYPE> downsample_all(const ARRAY_TYPE& original) 
