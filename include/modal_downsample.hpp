@@ -83,7 +83,7 @@ namespace cmb {
 			, cached_mode_label(0)
 		{}
 
-		const label_t& get_mode() {return cached_mode_label;}
+		const label_t& get_mode() const {return cached_mode_label;}
 
 		// Increment raw label value counts
 		void agglomerate_scalar(const label_t& label, const count_t& inc = 1) {
@@ -110,6 +110,9 @@ namespace cmb {
 		count_t cached_mode_count;
 		label_t cached_mode_label;
 	};
+
+
+	/// Agglomeration: Combine two images into one ///
 
 	// Zero dimensional kernel (just numbers -> histogram)
 	template<typename AGGLOMERATED_T, typename SOURCE_T>
@@ -212,6 +215,9 @@ namespace cmb {
 			agglomerate_scalar(result[i], original[2*i], original[2*i+1]);
 	}
 
+
+	/// DOWNSAMPLING: Convert larger arrays to smaller ones
+
 	// n-dimensional general method
 	// wrapped in a class so we could do partial specialization, below
 	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE, int DIMENSIONALITY>
@@ -221,11 +227,19 @@ namespace cmb {
 			assert(RESULT_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
 			assert(ORIGINAL_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
 			assert(original.size() == 2 * result.size());
-			typedef typename result[0]::type result_subarray_t;
-			typedef typename original[0]::type original_subarray_t;
+			typedef typename RESULT_ARRAY_TYPE::reference result_subarray_t;
+			typedef typename ORIGINAL_ARRAY_TYPE::value_type original_subarray_t;
 			for (std::size_t i = 0; i < result.size(); ++i) {
-				downsample_array<result_subarray_t, original_subarray_t, DIMENSIONALITY - 1>(result[i], original[2*i]);
-				downsample_array<result_subarray_t, original_subarray_t, DIMENSIONALITY - 1>(result[i], original[2*i + 1]);
+				ArrayDownsampler<
+					result_subarray_t,
+					original_subarray_t,
+					DIMENSIONALITY - 1>
+					::downsample_array(result[i], original[2*i]);
+				ArrayDownsampler<
+					result_subarray_t,
+					original_subarray_t, 
+					DIMENSIONALITY - 1>
+					::downsample_array(result[i], original[2*i + 1]);
 			}
 		}
 	};
@@ -250,6 +264,52 @@ namespace cmb {
 	void downsample_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
 	{
 		ArrayDownsampler<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE::dimensionality>::downsample_array(result, original);
+	}
+
+
+	/// RENDERING: Convert histograms back to raw labels ///
+
+	// n-dimensional general method
+	// wrapped in a class so we could do partial specialization, below
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE, int DIMENSIONALITY>
+	struct ArrayRenderer {
+		static void render_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
+		{
+			assert(RESULT_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
+			assert(ORIGINAL_ARRAY_TYPE::dimensionality == DIMENSIONALITY);
+			assert(original.size() == result.size());
+			typedef typename RESULT_ARRAY_TYPE::reference result_subarray_t;
+			typedef typename ORIGINAL_ARRAY_TYPE::value_type original_subarray_t;
+			for (std::size_t i = 0; i < result.size(); ++i) {
+				ArrayRenderer<
+					result_subarray_t,
+					original_subarray_t,
+					DIMENSIONALITY - 1>
+					::render_array(result[i], original[i]);
+			}
+		}
+	};
+
+	// 1-dimensional specialization
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE>
+	struct ArrayRenderer<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, 1>
+	{
+		static void render_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
+		{
+			assert(RESULT_ARRAY_TYPE::dimensionality == 1);
+			assert(ORIGINAL_ARRAY_TYPE::dimensionality == 1);
+			assert(original.size() == result.size());
+			for (std::size_t i = 0; i < result.size(); ++i) {
+				result[i] = original[i].get_mode();
+			}
+		}
+	};
+
+	// Easier-to-call delegate to ArrayRenderer class
+	template<typename RESULT_ARRAY_TYPE, typename ORIGINAL_ARRAY_TYPE>
+	void render_array(RESULT_ARRAY_TYPE& result, const ORIGINAL_ARRAY_TYPE& original)
+	{
+		ArrayRenderer<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE::dimensionality>::render_array(result, original);
 	}
 
 } // namespace cmb
