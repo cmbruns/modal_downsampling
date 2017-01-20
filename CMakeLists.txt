@@ -16,8 +16,7 @@ include_directories(${Qt5Core_INCLUDE_DIRS})
 # Enumerate all of our local source files for easier linking
 set(MODAL_DOWNSAMPLE_SRCS
 	${CMAKE_SOURCE_DIR}/include/modal_downsample.hpp
-	${CMAKE_SOURCE_DIR}/src/performance_parameters.hpp
-	${CMAKE_SOURCE_DIR}/src/modal_downsample.cpp
+	${CMAKE_SOURCE_DIR}/include/performance_parameters.hpp
 )
 
 add_subdirectory(src)

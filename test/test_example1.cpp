@@ -225,10 +225,25 @@ BOOST_AUTO_TEST_CASE(correct_example1_answer)
 	BOOST_CHECK(observed1[1] == expected2);
 
 	// Finally, test the real implementation
-	cmb::ModalDownsampler<element_type, 2, label_count_type> downsampler;
-	std::vector<array_type> observed2 = downsampler.downsample(input);
-	BOOST_CHECK(observed2[0] == expected1);
+	// cmb::ModalDownsampler<element_type, 2, label_count_type> downsampler;
+	
+	// std::vector<array_type> observed2 = cmb::downsample_all(input);
+	// BOOST_CHECK(observed2[0] == expected1);
 	// BOOST_CHECK(observed2[1] == expected2);
+
+	boost::multi_array<cmb::histogram_t<element_type>, 2> hist1(boost::extents[2][4]);
+	downsample_array(hist1, input);
+	array_type observed1b(boost::extents[2][4]);
+	cmb::render_array(observed1b, hist1);
+	BOOST_CHECK(observed1b == expected1);
+
+	boost::multi_array<cmb::histogram_t<element_type>, 2> hist2(boost::extents[1][2]);
+	downsample_array(hist2, hist1);
+	array_type observed2b(boost::extents[1][2]);
+	cmb::render_array(observed2b, hist2);
+	BOOST_CHECK(observed2b == expected2);
+
+
 }
 
 // Verify first simple example from the spec

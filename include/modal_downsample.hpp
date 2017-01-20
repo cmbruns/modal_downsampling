@@ -31,35 +31,6 @@ SOFTWARE.
 #include <boost/multi_array.hpp>
 
 namespace cmb {
-	/*
-	  ModalDownsampler class recursively downsamples a multidimensional 
-	   raster image by one power of two, aggregating each sub-block into 
-	   the modal (most-frequent) value in the sub-block.
-
-	  Template parameters:
-	   LABEL_TYPE: must be the element type of the input raster image, 
-	     e.g. uint8_t
-	   DIMENSION_COUNT: number of dimensions in the input image
-	   LABEL_COUNT_TYPE: must be able to hold the maximum number of
-	     instances of any one label, or up to the total number of pixels
-		 in the input image. For best memory efficiency, this should
-		 be the smallest integer type capable of holding such a value
-	 */
-	template<
-		typename LABEL_TYPE = uint32_t,
-		int DIMENSION_COUNT = 3, 
-		typename LABEL_COUNT_TYPE = std::size_t>
-	class ModalDownsampler {
-	public:
-		typedef LABEL_TYPE label_t;
-		typedef boost::multi_array<label_t, DIMENSION_COUNT> raster_t;
-		typedef std::vector<raster_t> downsamplings_t;
-		typedef LABEL_COUNT_TYPE label_count_t;
-
-		// Top-level downsampler
-		downsamplings_t downsample(const raster_t& original);
-	};
-
 
 	// New way below?
 
@@ -311,6 +282,53 @@ namespace cmb {
 	{
 		ArrayRenderer<RESULT_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE, ORIGINAL_ARRAY_TYPE::dimensionality>::render_array(result, original);
 	}
+
+
+	// Convenience method to create all downsampled images in one go
+	template<typename ARRAY_TYPE>
+	std::vector<ARRAY_TYPE> downsample_all(const ARRAY_TYPE& original) 
+	{
+		std::vector<ARRAY_TYPE> result;
+
+		const int ndims = ARRAY_TYPE::dimensionality;
+		std::size_t smallest_dimension = 100;
+		std::vector<int> extents;
+		for (std::size_t d = 0; d < ndims; ++d) {
+			std::size_t dim = original.shape()[d];
+			smallest_dimension = std::min(dim, smallest_dimension);
+			extents.push_back(dim / 2);
+		}
+		typedef boost::multi_array<histogram_t<ARRAY_TYPE::value_type>, ndims> hist_t;
+		hist_t hist(extents);
+		downsample_array(hist, original);
+
+		result.push_back(ARRAY_TYPE(extents));
+		ARRAY_TYPE& downsampled = result.back();
+		render_array(downsampled, hist);
+
+		return result;
+
+		/* TODO
+		while (smallest_dimension > 1) 
+		{
+			result.push_back(ARRAY_TYPE(extents));
+			ARRAY_TYPE& downsampled = result.back();
+			render_array(downsampled, hist);
+
+			extents.clear();
+			for (std::size_t d = 0; d < ndims; ++d) {
+				std::size_t dim0 = hist.shape()[d];
+				std::size_t dim1 = dim0 / 2;
+				smallest_dimension = std::min(dim1, smallest_dimension);
+				extents.push_back(dim1);
+			}
+			hist = hist_t(extents);
+		}
+		*/
+
+		return result;
+	}
+
 
 } // namespace cmb
 
